@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  --background: #050505;
+  --foreground: #ffffff;
+  --neon-teal: #a5f3fc; /* teal-200 */
+  --emergency-red: #ef4444; /* red-500 */
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-mono), monospace;
+  overflow-x: hidden;
+}
+
+/* Geometric Grid Background */
+.bg-grid-pattern {
+  background-image: 
+    linear-gradient(to right, rgba(165, 243, 252, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(165, 243, 252, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.bg-dot-pattern {
+  background-image: radial-gradient(rgba(165, 243, 252, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.01);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.terminal-container {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(165, 243, 252, 0.2) transparent;
+}
+
+.terminal-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.terminal-container::-webkit-scrollbar-thumb {
+  background: rgba(165, 243, 252, 0.2);
+  border-radius: 4px;
+}
+
+@keyframes pulse-teal {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.animate-pulse-teal {
+  animation: pulse-teal 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Minimalism tiles effects */
+.tile-hover:hover {
+  border-color: rgba(165, 243, 252, 0.3);
+  box-shadow: 0 0 15px rgba(165, 243, 252, 0.05);
+  transform: translateY(-2px);
+  transition: all 0.3s ease;
+}
+
+.kill-switch-hover:hover {
+  border-color: var(--emergency-red);
+  box-shadow: 0 0 25px rgba(239, 68, 68, 0.15);
+  color: var(--emergency-red);
+  transition: all 0.4s ease;
+}

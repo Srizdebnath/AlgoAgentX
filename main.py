@@ -1,6 +1,7 @@
 import os
 import re
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -12,6 +13,15 @@ from agent_tools import get_wallet_balance, trigger_guardian_payment, execute_ar
 load_dotenv()
 
 app = FastAPI(title="AlgoAgentX API")
+
+# CORS — allow development frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Initialize LLM using native ChatGroq — reads GROQ_API_KEY from environment automatically
 llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
