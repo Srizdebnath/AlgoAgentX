@@ -65,6 +65,39 @@ async def chat_endpoint(req: ChatRequest):
     except Exception as e:
         return {"response": f"Error interacting with agent: {str(e)}", "tx_ids": []}
 
+import base64
+from algosdk import transaction
+from algosdk.v2client import algod
+
+...
+
+@app.get("/api/build-kill-txn")
+async def build_kill_txn(sender: str):
+    """
+    Constructs an unsigned ApplicationCall (NoOp) for toggle_kill_switch ABI method.
+    Returns the txn as a base64 string.
+    """
+    try:
+        app_id = int(os.environ.get("APP_ID", 0))
+        # Default LocalNet credentials
+        algod_client = algod.AlgodClient("a" * 64, "http://localhost:4001")
+        params = algod_client.suggested_params()
+        
+        # selector for toggle_kill_switch()void: 0xbfa92465
+        method_selector = base64.b16decode("bfa92465", casefold=True)
+        
+        txn = transaction.ApplicationNoOpTxn(
+            sender=sender,
+            sp=params,
+            index=app_id,
+            app_args=[method_selector]
+        )
+        
+        encoded_txn = base64.b64encode(transaction.write_to_binary(txn)).decode()
+        return {"txn": encoded_txn}
+    except Exception as e:
+        return {"error": str(e)}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

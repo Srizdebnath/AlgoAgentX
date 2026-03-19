@@ -2,25 +2,28 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useWallet } from "@txnlab/use-wallet-react";
-import { Terminal, Shield, Power, AlertTriangle, Send, Link as LinkIcon, RefreshCw } from "lucide-react";
+import { Terminal, Shield, Power, AlertTriangle, Send, Link as LinkIcon, RefreshCw, X } from "lucide-react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import toast from "react-hot-toast";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 export default function Dashboard() {
-  const { activeAddress, signer, wallets, activeWallet } = useWallet();
+  const { activeAddress, wallets, activeWallet, signTransactions, algodClient } = useWallet();
   const [loading, setLoading] = useState(true);
+  const [showWalletModal, setShowWalletModal] = useState(false);
   const [terminalOutput, setTerminalOutput] = useState<Array<{ type: 'input' | 'output' | 'system', content: string, txId?: string }>>([
     { type: 'system', content: "SYSTEM INITIALIZED > ENCRYPTED_LINK_ESTABLISHED" },
     { type: 'system', content: "THOUGHT PROCESSED > READY FOR COMMANDS" }
   ]);
   const [command, setCommand] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isKillSwitchProcessing, setIsKillSwitchProcessing] = useState(false);
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll terminal
@@ -59,15 +62,56 @@ export default function Dashboard() {
       ]);
     } catch (error) {
       setTerminalOutput(prev => [...prev, { type: 'system', content: `ERROR > ${error instanceof Error ? error.message : "NETWORK CONNECTION FAILED"}` }]);
+      toast.error("Agent communication failed");
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const triggerKillSwitch = () => {
-    console.log("Emergency Kill Switch Triggered");
-    setTerminalOutput(prev => [...prev, { type: 'system', content: "EMERGENCY_KILL_SWITCH > PROTOCOL_INITIATED" }]);
-    alert("CRITICAL_OVERRIDE: Financial Guardian engaged. All manual overrides disabled. Security lockdown simulated.");
+  const triggerKillSwitch = async () => {
+    if (!activeAddress) {
+      toast.error("Please connect wallet first");
+      setShowWalletModal(true);
+      return;
+    }
+
+    if (isKillSwitchProcessing) return;
+
+    setIsKillSwitchProcessing(true);
+    const toastId = toast.loading("Building emergency override transaction...");
+    
+    try {
+      // Step B: Fetch the unsigned base64 transaction
+      const response = await axios.get(`http://localhost:8000/api/build-kill-txn?sender=${activeAddress}`);
+      const b64Txn = response.data.txn;
+
+      if (!b64Txn) throw new Error("Failed to construct kill switch transaction");
+
+      // Step C: Prompt user to sign
+      toast.loading("Action required: Sign in wallet", { id: toastId });
+      const txnBytes = new Uint8Array(Buffer.from(b64Txn, 'base64'));
+      const signedTxns = await signTransactions([txnBytes]);
+
+      // Step D: Send transaction to LocalNet
+      toast.loading("Broadcasting emergency override...", { id: toastId });
+      const validSignedTxns = signedTxns.filter((t): t is Uint8Array => !!t);
+      const result = await algodClient.sendRawTransaction(validSignedTxns).do();
+
+      // Step E: Terminal alert
+      setTerminalOutput(prev => [...prev, { 
+        type: 'system', 
+        content: `SYSTEM OVERRIDE: AI AGENT LOCKED OUT > TX: ${result.txid || result['txid'] || "COMPLETE"}` 
+      }]);
+      toast.success("AGX_KILL_SWITCH_ACTIVE", { id: toastId });
+      console.log("Kill Switch successful:", result.txid || result['txid']);
+    } catch (error) {
+      console.error(error);
+      const msg = error instanceof Error ? error.message : "Kill Switch Failed";
+      toast.error(msg, { id: toastId });
+      setTerminalOutput(prev => [...prev, { type: 'system', content: `ERROR > KILL SWITCH FAILED: ${msg.toUpperCase()}` }]);
+    } finally {
+      setIsKillSwitchProcessing(false);
+    }
   };
 
   if (loading) {
@@ -94,6 +138,53 @@ export default function Dashboard() {
 
   return (
     <main className="relative min-h-screen flex flex-col p-6 gap-6 z-10">
+      {/* Wallet Modal */}
+      <AnimatePresence>
+        {showWalletModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowWalletModal(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative glass w-full max-w-sm p-6 border-cyan-400/20"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xs font-bold tracking-[0.3em] text-cyan-400 uppercase">Connect_Provider</h3>
+                <button onClick={() => setShowWalletModal(false)} className="opacity-40 hover:opacity-100 transition-opacity">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="grid gap-3">
+                {wallets?.map((wallet) => (
+                  <button
+                    key={wallet.id}
+                    onClick={async () => {
+                      await wallet.connect();
+                      setShowWalletModal(false);
+                      toast.success(`Connected to ${wallet.metadata.name}`);
+                    }}
+                    className="flex items-center justify-between p-3 border border-white/5 hover:border-cyan-400/40 hover:bg-cyan-400/5 transition-all group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <img src={wallet.metadata.icon} alt={wallet.metadata.name} className="w-5 h-5 grayscale group-hover:grayscale-0 transition-all" />
+                      <span className="text-xs tracking-wider">{wallet.metadata.name}</span>
+                    </div>
+                    {wallet.isActive && <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_5px_#22d3ee]" />}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="flex justify-between items-start">
         <div className="flex flex-col">
@@ -106,19 +197,16 @@ export default function Dashboard() {
 
         <div className="flex gap-4">
           {!activeAddress ? (
-            wallets?.map((wallet) => (
-              <button
-                key={wallet.id}
-                onClick={() => wallet.connect()}
-                className="px-4 py-1.5 border border-cyan-400/30 text-cyan-200 text-xs font-mono uppercase hover:bg-cyan-400/10 transition-all rounded-sm tracking-widest"
-              >
-                Connect_{wallet.metadata.name}
-              </button>
-            ))
+            <button
+               onClick={() => setShowWalletModal(true)}
+               className="px-4 py-1.5 border border-cyan-400/30 text-cyan-200 text-xs font-mono uppercase hover:bg-cyan-400/10 transition-all rounded-sm tracking-widest"
+             >
+               Connect_Wallet
+             </button>
           ) : (
             <div className="flex gap-3">
                <div className="px-4 py-1.5 border border-emerald-500/30 text-emerald-400 text-xs font-mono rounded-sm bg-emerald-500/5 hidden md:block">
-                ALGO_ENV: <span className="opacity-70 tracking-widest uppercase">LOCALNET</span>
+                NODE: <span className="opacity-70 tracking-widest uppercase">LOCALNET</span>
               </div>
               <button
                 onClick={() => activeWallet?.disconnect()}
@@ -165,9 +253,13 @@ export default function Dashboard() {
         <div className="md:col-span-2 md:row-span-2 flex items-center justify-center">
           <button 
             onClick={triggerKillSwitch}
-            className="w-full h-full glass border-2 border-transparent kill-switch-hover flex flex-col items-center justify-center gap-4 transition-all"
+            disabled={isKillSwitchProcessing}
+            className={cn(
+              "w-full h-full glass border-2 border-transparent kill-switch-hover flex flex-col items-center justify-center gap-4 transition-all",
+              isKillSwitchProcessing && "opacity-50 cursor-wait"
+            )}
           >
-            <Power className="w-12 h-12" />
+            <Power className={cn("w-12 h-12 transition-colors", isKillSwitchProcessing ? "text-red-500 animate-pulse" : "text-white")} />
             <span className="text-sm tracking-[0.5em] font-bold">EMERGENCY_KILL_SWITCH</span>
             <div className="text-[9px] text-white/20 uppercase tracking-widest mt-2 px-6 text-center">
               Immediately revoke agent spending permissions for all authorized accounts
@@ -257,10 +349,10 @@ export default function Dashboard() {
               <button 
                 type="submit"
                 disabled={isProcessing}
-                className="bg-cyan-400/10 border border-cyan-400/30 hover:bg-cyan-400/20 px-6 text-xs text-cyan-400 font-bold uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2"
+                className="bg-cyan-400/10 border border-cyan-400/30 hover:bg-cyan-400/20 px-4 md:px-6 text-xs text-cyan-400 font-bold uppercase tracking-widest disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <Send className="w-3.5 h-3.5" />
-                EXEC
+                <span className="hidden md:inline">EXEC</span>
               </button>
             </form>
           </div>
