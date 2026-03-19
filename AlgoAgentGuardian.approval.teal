@@ -174,10 +174,11 @@ execute_payment_after_if_else@3:
     dig 1
     >=
     assert // Daily limit exceeded
-    // contract.py:30-33
+    // contract.py:30-34
     // itxn.Payment(
     //     receiver=receiver,
-    //     amount=amount
+    //     amount=amount,
+    //     fee=UInt64(1000),
     // ).submit()
     itxn_begin
     swap
@@ -188,20 +189,23 @@ execute_payment_after_if_else@3:
     // itxn.Payment(
     intc_1 // pay
     itxn_field TypeEnum
-    intc_0 // 0
+    // contract.py:33
+    // fee=UInt64(1000),
+    pushint 1000
     itxn_field Fee
-    // contract.py:30-33
+    // contract.py:30-34
     // itxn.Payment(
     //     receiver=receiver,
-    //     amount=amount
+    //     amount=amount,
+    //     fee=UInt64(1000),
     // ).submit()
     itxn_submit
-    // contract.py:35
+    // contract.py:36
     // self.spent_today += amount
     bytec_0 // "spent_today"
     swap
     app_global_put
-    // contract.py:36
+    // contract.py:37
     // self.last_spend_timestamp = Global.latest_timestamp
     bytec 5 // "last_spend_timestamp"
     global LatestTimestamp
@@ -214,7 +218,7 @@ execute_payment_after_if_else@3:
 
 // contract.AlgoAgentGuardian.toggle_kill_switch[routing]() -> void:
 toggle_kill_switch:
-    // contract.py:40
+    // contract.py:41
     // assert Txn.sender == self.owner, "Only owner can toggle"
     txn Sender
     intc_0 // 0
@@ -223,7 +227,7 @@ toggle_kill_switch:
     assert // check self.owner exists
     ==
     assert // Only owner can toggle
-    // contract.py:41
+    // contract.py:42
     // self.is_active = not self.is_active
     intc_0 // 0
     bytec_1 // "is_active"
@@ -233,7 +237,7 @@ toggle_kill_switch:
     bytec_1 // "is_active"
     swap
     app_global_put
-    // contract.py:38
+    // contract.py:39
     // @abimethod
     intc_1 // 1
     return

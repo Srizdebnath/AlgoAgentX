@@ -1,4 +1,5 @@
 from algokit_utils import AlgorandClient, AlgoAmount
+from algosdk import mnemonic
 from typed_client import AlgoAgentGuardianFactory
 
 def main():
@@ -55,6 +56,13 @@ def main():
     )
 
     print("Contract successfully setup!")
+
+    print("Writing Configuration to .env...")
+    with open(".env", "a") as f:
+        f.write(f"APP_ID={app_client.app_id}\n")
+        f.write(f"OWNER_MNEMONIC=\"{mnemonic.from_private_key(owner.private_key)}\"\n")
+        f.write(f"AGENT_MNEMONIC=\"{mnemonic.from_private_key(agent.private_key)}\"\n")
+    print("Variables securely written to .env!")
 
 if __name__ == "__main__":
     main()

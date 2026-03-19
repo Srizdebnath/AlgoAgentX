@@ -29,7 +29,8 @@ class AlgoAgentGuardian(ARC4Contract):
 
         itxn.Payment(
             receiver=receiver,
-            amount=amount
+            amount=amount,
+            fee=UInt64(1000),
         ).submit()
 
         self.spent_today += amount
