@@ -1,0 +1,239 @@
+#pragma version 11
+#pragma typetrack false
+
+// algopy.arc4.ARC4Contract.approval_program() -> uint64:
+main:
+    intcblock 0 1 32 8
+    bytecblock "spent_today" "is_active" "owner" "agent_address" "daily_limit" "last_spend_timestamp"
+    txn ApplicationID
+    bnz main_after_if_else@2
+    // contract.py:6
+    // self.owner = Txn.sender
+    bytec_2 // "owner"
+    txn Sender
+    app_global_put
+    // contract.py:7
+    // self.agent_address = Txn.sender
+    bytec_3 // "agent_address"
+    txn Sender
+    app_global_put
+    // contract.py:8
+    // self.daily_limit = UInt64(0)
+    bytec 4 // "daily_limit"
+    intc_0 // 0
+    app_global_put
+    // contract.py:9
+    // self.spent_today = UInt64(0)
+    bytec_0 // "spent_today"
+    intc_0 // 0
+    app_global_put
+    // contract.py:10
+    // self.last_spend_timestamp = UInt64(0)
+    bytec 5 // "last_spend_timestamp"
+    intc_0 // 0
+    app_global_put
+    // contract.py:11
+    // self.is_active = True
+    bytec_1 // "is_active"
+    intc_1 // 1
+    app_global_put
+
+main_after_if_else@2:
+    // contract.py:4
+    // class AlgoAgentGuardian(ARC4Contract):
+    txn NumAppArgs
+    bz main___algopy_default_create@12
+    txn OnCompletion
+    !
+    assert
+    txn ApplicationID
+    assert
+    pushbytess 0xf50de121 0xfd59a61f 0xbfa92465 // method "setup_guardian(address,uint64)void", method "execute_payment(uint64,address)void", method "toggle_kill_switch()void"
+    txna ApplicationArgs 0
+    match setup_guardian execute_payment toggle_kill_switch
+    err
+
+main___algopy_default_create@12:
+    txn OnCompletion
+    !
+    txn ApplicationID
+    !
+    &&
+    return
+
+
+// contract.AlgoAgentGuardian.setup_guardian[routing]() -> void:
+setup_guardian:
+    // contract.py:13
+    // @abimethod
+    txna ApplicationArgs 1
+    dup
+    len
+    intc_2 // 32
+    ==
+    assert // invalid number of bytes for arc4.static_array<arc4.uint8, 32>
+    txna ApplicationArgs 2
+    dup
+    len
+    intc_3 // 8
+    ==
+    assert // invalid number of bytes for arc4.uint64
+    btoi
+    // contract.py:15
+    // assert Txn.sender == self.owner, "Only owner can setup"
+    txn Sender
+    intc_0 // 0
+    bytec_2 // "owner"
+    app_global_get_ex
+    assert // check self.owner exists
+    ==
+    assert // Only owner can setup
+    // contract.py:16
+    // self.agent_address = agent_address
+    bytec_3 // "agent_address"
+    uncover 2
+    app_global_put
+    // contract.py:17
+    // self.daily_limit = daily_limit
+    bytec 4 // "daily_limit"
+    swap
+    app_global_put
+    // contract.py:13
+    // @abimethod
+    intc_1 // 1
+    return
+
+
+// contract.AlgoAgentGuardian.execute_payment[routing]() -> void:
+execute_payment:
+    // contract.py:19
+    // @abimethod
+    txna ApplicationArgs 1
+    dup
+    len
+    intc_3 // 8
+    ==
+    assert // invalid number of bytes for arc4.uint64
+    btoi
+    txna ApplicationArgs 2
+    dup
+    len
+    intc_2 // 32
+    ==
+    assert // invalid number of bytes for arc4.static_array<arc4.uint8, 32>
+    // contract.py:21
+    // assert self.is_active, "Contract is not active"
+    intc_0 // 0
+    bytec_1 // "is_active"
+    app_global_get_ex
+    assert // check self.is_active exists
+    assert // Contract is not active
+    // contract.py:22
+    // assert Txn.sender == self.agent_address, "Only agent can execute payments"
+    txn Sender
+    intc_0 // 0
+    bytec_3 // "agent_address"
+    app_global_get_ex
+    assert // check self.agent_address exists
+    ==
+    assert // Only agent can execute payments
+    // contract.py:24
+    // time_since_last_spend = Global.latest_timestamp - self.last_spend_timestamp
+    global LatestTimestamp
+    intc_0 // 0
+    bytec 5 // "last_spend_timestamp"
+    app_global_get_ex
+    assert // check self.last_spend_timestamp exists
+    -
+    // contract.py:25
+    // if time_since_last_spend > 86400:
+    pushint 86400
+    >
+    bz execute_payment_after_if_else@3
+    // contract.py:26
+    // self.spent_today = UInt64(0)
+    bytec_0 // "spent_today"
+    intc_0 // 0
+    app_global_put
+
+execute_payment_after_if_else@3:
+    // contract.py:28
+    // assert self.spent_today + amount <= self.daily_limit, "Daily limit exceeded"
+    intc_0 // 0
+    bytec_0 // "spent_today"
+    app_global_get_ex
+    assert // check self.spent_today exists
+    dig 2
+    dup
+    cover 2
+    +
+    intc_0 // 0
+    bytec 4 // "daily_limit"
+    app_global_get_ex
+    assert // check self.daily_limit exists
+    dig 1
+    >=
+    assert // Daily limit exceeded
+    // contract.py:30-33
+    // itxn.Payment(
+    //     receiver=receiver,
+    //     amount=amount
+    // ).submit()
+    itxn_begin
+    swap
+    itxn_field Amount
+    dig 1
+    itxn_field Receiver
+    // contract.py:30
+    // itxn.Payment(
+    intc_1 // pay
+    itxn_field TypeEnum
+    intc_0 // 0
+    itxn_field Fee
+    // contract.py:30-33
+    // itxn.Payment(
+    //     receiver=receiver,
+    //     amount=amount
+    // ).submit()
+    itxn_submit
+    // contract.py:35
+    // self.spent_today += amount
+    bytec_0 // "spent_today"
+    swap
+    app_global_put
+    // contract.py:36
+    // self.last_spend_timestamp = Global.latest_timestamp
+    bytec 5 // "last_spend_timestamp"
+    global LatestTimestamp
+    app_global_put
+    // contract.py:19
+    // @abimethod
+    intc_1 // 1
+    return
+
+
+// contract.AlgoAgentGuardian.toggle_kill_switch[routing]() -> void:
+toggle_kill_switch:
+    // contract.py:40
+    // assert Txn.sender == self.owner, "Only owner can toggle"
+    txn Sender
+    intc_0 // 0
+    bytec_2 // "owner"
+    app_global_get_ex
+    assert // check self.owner exists
+    ==
+    assert // Only owner can toggle
+    // contract.py:41
+    // self.is_active = not self.is_active
+    intc_0 // 0
+    bytec_1 // "is_active"
+    app_global_get_ex
+    assert // check self.is_active exists
+    !
+    bytec_1 // "is_active"
+    swap
+    app_global_put
+    // contract.py:38
+    // @abimethod
+    intc_1 // 1
+    return
